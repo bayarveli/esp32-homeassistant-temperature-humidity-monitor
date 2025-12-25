@@ -30,25 +30,17 @@
 // "dependencies:
 //   esp-idf-lib/dht: ^1.1.7"
 #include "dht.h"
+#include "credentials.h"
 
 static const char* TAG = "DRIPCORE";
-
-// DHT22 Configuration
-#define DHT22_GPIO GPIO_NUM_10
-
-// WiFi Configuration - Update these with your credentials
-#define WIFI_SSID      "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD  "YOUR_WIFI_PASSWORD"
-
-// MQTT Configuration - Update these with your MQTT broker details
-#define MQTT_BROKER_URI "mqtt://your_mqtt_broker_ip"  // Replace with your PC's IP
-#define MQTT_USERNAME   "YOUR_MQTT_USERNAME"  // Leave empty for no auth
-#define MQTT_PASSWORD   "YOUR_MQTT_PASSWORD"  // Leave empty for no auth
 
 // Home Assistant MQTT Discovery Configuration
 #define HA_DISCOVERY_PREFIX "homeassistant"
 #define DEVICE_ID "temp_and_humid_001"
 #define DEVICE_NAME "Temperature and Humidity Sensor"
+
+// DHT22 Sensor Configuration
+#define DHT22_GPIO GPIO_NUM_10
 
 // WiFi event group
 static EventGroupHandle_t s_wifi_event_group;

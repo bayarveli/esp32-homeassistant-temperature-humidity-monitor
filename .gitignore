@@ -61,5 +61,8 @@ sdkconfig.old
 dependencies.lock
 managed_components/
 
+# Credentials with sensitive data
+main/credentials.h
+
 # IDE and Editor files
 .vscode/
