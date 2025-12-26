@@ -1,0 +1,183 @@
+#include "mqtt_manager.h"
+#include "credentials.h"
+#include "mqtt_client.h" // ESP-IDF MQTT
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_mac.h"
+#include <cstring>
+
+static const char* TAG_MQTT = "MQTTManager";
+
+// Keep discovery constants local for now (we can centralize later)
+#define HA_DISCOVERY_PREFIX "homeassistant"
+#define DEVICE_NAME "Temperature and Humidity Sensor"
+
+static esp_mqtt_client_handle_t s_mqtt_client = nullptr;
+static bool s_mqtt_connected = false;
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    (void)handler_args;
+    (void)base;
+    (void)event_data;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG_MQTT, "MQTT Connected");
+        s_mqtt_connected = true;
+        break;
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG_MQTT, "MQTT Disconnected");
+        s_mqtt_connected = false;
+        break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGI(TAG_MQTT, "MQTT Error");
+        break;
+    default:
+        break;
+    }
+}
+
+void mqtt_init(void)
+{
+    esp_mqtt_client_config_t mqtt_cfg = {};
+    mqtt_cfg.broker.address.uri = MQTT_BROKER_URI;
+
+    if (strlen(MQTT_USERNAME) > 0) {
+        mqtt_cfg.credentials.username = MQTT_USERNAME;
+    }
+    if (strlen(MQTT_PASSWORD) > 0) {
+        mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
+    }
+
+    s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(s_mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(s_mqtt_client);
+}
+
+bool mqtt_is_connected(void)
+{
+    return s_mqtt_connected;
+}
+
+void mqtt_publish_sensor(float temperature, float humidity)
+{
+    if (!s_mqtt_connected) return;
+
+    // Build MAC string for topic suffix
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char mac_str[13];
+    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    char topic[64];
+    char payload[32];
+
+    // Publish status
+    snprintf(topic, sizeof(topic), "dripcore/%s/status", mac_str);
+    esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 0);
+
+    // Publish temperature
+    snprintf(topic, sizeof(topic), "climate/%s/temperature", mac_str);
+    snprintf(payload, sizeof(payload), "%.1f", temperature);
+    esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
+
+    // Publish humidity
+    snprintf(topic, sizeof(topic), "climate/%s/humidity", mac_str);
+    snprintf(payload, sizeof(payload), "%.1f", humidity);
+    esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
+}
+
+void mqtt_send_ha_discovery(void)
+{
+    if (!s_mqtt_connected) {
+        ESP_LOGW(TAG_MQTT, "MQTT not connected, skipping HA discovery");
+        return;
+    }
+
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char mac_str[13];
+    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    char* device_info = (char*)malloc(512);
+    char* sensor_config = (char*)malloc(1024);
+    char* binary_sensor_config = (char*)malloc(1024);
+    char discovery_topic[128];
+
+    if (!device_info || !sensor_config || !binary_sensor_config) {
+        ESP_LOGE(TAG_MQTT, "Failed to allocate memory for HA discovery");
+        free(device_info);
+        free(sensor_config);
+        free(binary_sensor_config);
+        return;
+    }
+
+    snprintf(device_info, 512,
+        "\"device\":{"
+        "\"identifiers\":[\"%s\"],"
+        "\"name\":\"%s\","
+        "\"model\":\"ESP32-C3 Super Mini and DHT22\","
+        "\"manufacturer\":\"Pupa DIY\","
+        "\"sw_version\":\"v0.0.1\","
+        "\"hw_version\":\"0.1\""
+        "}",
+        mac_str, DEVICE_NAME);
+
+    // Binary sensor discovery (status)
+    snprintf(binary_sensor_config, 1024,
+        "{"
+        "\"name\":\"%s Status\"," 
+        "\"unique_id\":\"%s_status\"," 
+        "\"state_topic\":\"dripcore/%s/status\"," 
+        "\"payload_on\":\"online\"," 
+        "\"payload_off\":\"offline\"," 
+        "\"device_class\":\"connectivity\","
+        "%s"
+        "}",
+        DEVICE_NAME, mac_str, mac_str, device_info);
+
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/binary_sensor/%s_status/config", HA_DISCOVERY_PREFIX, mac_str);
+    esp_mqtt_client_publish(s_mqtt_client, discovery_topic, binary_sensor_config, 0, 1, 1);
+    ESP_LOGI(TAG_MQTT, "Sent HA discovery for status sensor");
+
+    // Temperature sensor
+    snprintf(sensor_config, 1024,
+        "{"
+        "\"name\":\"%s Temperature\"," 
+        "\"unique_id\":\"%s_temperature\"," 
+        "\"state_topic\":\"climate/%s/temperature\"," 
+        "\"unit_of_measurement\":\"°C\"," 
+        "\"device_class\":\"temperature\"," 
+        "\"state_class\":\"measurement\"," 
+        "%s"
+        "}",
+        DEVICE_NAME, mac_str, mac_str, device_info);
+
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, mac_str);
+    esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
+    ESP_LOGI(TAG_MQTT, "Sent HA discovery for temperature sensor");
+
+    // Humidity sensor
+    snprintf(sensor_config, 1024,
+        "{"
+        "\"name\":\"%s Humidity\"," 
+        "\"unique_id\":\"%s_humidity\"," 
+        "\"state_topic\":\"climate/%s/humidity\"," 
+        "\"unit_of_measurement\":\"%%\"," 
+        "\"device_class\":\"humidity\"," 
+        "\"state_class\":\"measurement\"," 
+        "%s"
+        "}",
+        DEVICE_NAME, mac_str, mac_str, device_info);
+
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, mac_str);
+    esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
+    ESP_LOGI(TAG_MQTT, "Sent HA discovery for humidity sensor");
+
+    free(device_info);
+    free(sensor_config);
+    free(binary_sensor_config);
+}

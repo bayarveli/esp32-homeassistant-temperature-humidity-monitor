@@ -32,6 +32,7 @@
 #include "dht.h"
 #include "credentials.h"
 #include "wifi_manager.h"
+#include "mqtt_manager.h"
 
 static const char* TAG = "DRIPCORE";
 
@@ -43,51 +44,7 @@ static const char* TAG = "DRIPCORE";
 // DHT22 Sensor Configuration
 #define DHT22_GPIO GPIO_NUM_10
 
-// MQTT client handle
-static esp_mqtt_client_handle_t mqtt_client = nullptr;
-static bool mqtt_connected = false;
-
-// MQTT event handler
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
-{
-    (void)handler_args;  // Unused
-    (void)event_data;    // Unused
-    
-    switch ((esp_mqtt_event_id_t)event_id) {
-    case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "MQTT Connected");
-        mqtt_connected = true;
-        break;
-    case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGI(TAG, "MQTT Disconnected");
-        mqtt_connected = false;
-        break;
-    case MQTT_EVENT_ERROR:
-        ESP_LOGI(TAG, "MQTT Error");
-        break;
-    default:
-        break;
-    }
-}
-
-// Initialize MQTT
-void mqtt_init(void)
-{
-    esp_mqtt_client_config_t mqtt_cfg = {};
-    mqtt_cfg.broker.address.uri = MQTT_BROKER_URI;
-    
-    // Use authentication if credentials are provided
-    if (strlen(MQTT_USERNAME) > 0) {
-        mqtt_cfg.credentials.username = MQTT_USERNAME;
-    }
-    if (strlen(MQTT_PASSWORD) > 0) {
-        mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
-    }
-    
-    mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(mqtt_client);
-}
+// MQTT handled by mqtt_manager module
 
 // DHT22 sensor okuma fonksiyonu
 void read_dht22_sensor(float* temperature, float* humidity)
@@ -101,141 +58,9 @@ void read_dht22_sensor(float* temperature, float* humidity)
     }
 }
 
-// Send Home Assistant MQTT Discovery message
-void send_ha_discovery(void)
-{
-    if (!mqtt_connected) {
-        ESP_LOGW(TAG, "MQTT not connected, skipping HA discovery");
-        return;
-    }
-    
-    // Get MAC address for unique ID
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char mac_str[13];
-    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    
-    // Allocate memory on heap instead of stack to prevent overflow
-    char* device_info = (char*)malloc(512);
-    char* sensor_config = (char*)malloc(1024);
-    char* binary_sensor_config = (char*)malloc(1024);
-    char discovery_topic[128];
-    
-    if (!device_info || !sensor_config || !binary_sensor_config) {
-        ESP_LOGE(TAG, "Failed to allocate memory for HA discovery");
-        free(device_info);
-        free(sensor_config);
-        free(binary_sensor_config);
-        return;
-    }
-    
-    // Device information JSON
-    snprintf(device_info, 512,
-        "\"device\":{"
-        "\"identifiers\":[\"%s\"],"
-        "\"name\":\"%s\","
-        "\"model\":\"ESP32-C3 Super Mini and DHT22\","
-        "\"manufacturer\":\"Pupa DIY\","
-        "\"sw_version\":\"v0.0.1\","
-        "\"hw_version\":\"0.1\""
-        "}",
-        mac_str, DEVICE_NAME);
-    
-    // Binary sensor discovery message (online status)
-    snprintf(binary_sensor_config, 1024,
-        "{"
-        "\"name\":\"%s Status\","
-        "\"unique_id\":\"%s_status\","
-        "\"state_topic\":\"dripcore/%s/status\","
-        "\"payload_on\":\"online\","
-        "\"payload_off\":\"offline\","
-        "\"device_class\":\"connectivity\","
-        "%s"
-        "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
-    
-    // Send binary sensor discovery
-    snprintf(discovery_topic, sizeof(discovery_topic), 
-             "%s/binary_sensor/%s_status/config", HA_DISCOVERY_PREFIX, mac_str);
-    
-    esp_mqtt_client_publish(mqtt_client, discovery_topic, binary_sensor_config, 0, 1, 1);
-    ESP_LOGI(TAG, "Sent HA discovery for status sensor");
-    
-    // Temperature sensor discovery
-    snprintf(sensor_config, 1024,
-        "{"
-        "\"name\":\"%s Temperature\","
-        "\"unique_id\":\"%s_temperature\","
-        "\"state_topic\":\"climate/%s/temperature\","
-        "\"unit_of_measurement\":\"°C\","
-        "\"device_class\":\"temperature\","
-        "\"state_class\":\"measurement\","
-        "%s"
-        "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
-    
-    snprintf(discovery_topic, sizeof(discovery_topic), 
-             "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, mac_str);
-    
-    esp_mqtt_client_publish(mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
-    ESP_LOGI(TAG, "Sent HA discovery for temperature sensor");
-    
-    // Humidity sensor discovery
-    snprintf(sensor_config, 1024,
-        "{"
-        "\"name\":\"%s Humidity\","
-        "\"unique_id\":\"%s_humidity\","
-        "\"state_topic\":\"climate/%s/humidity\","
-        "\"unit_of_measurement\":\"%%\","
-        "\"device_class\":\"humidity\","
-        "\"state_class\":\"measurement\","
-        "%s"
-        "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
-    
-    snprintf(discovery_topic, sizeof(discovery_topic), 
-             "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, mac_str);
-    
-    esp_mqtt_client_publish(mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
-    ESP_LOGI(TAG, "Sent HA discovery for humidity sensor");
-    
-    // Free allocated memory
-    free(device_info);
-    free(sensor_config);
-    free(binary_sensor_config);
-}
+// HA discovery handled by mqtt_manager
 
-// Publish sensor data to MQTT
-void publish_sensor_data(float temperature, float humidity)
-{
-    if (!mqtt_connected) return;
-    
-    // Get MAC for topic
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char mac_str[13];
-    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    
-    // Publish uptime
-    char topic[64];
-    char payload[32];
-    
-    // Publish status
-    snprintf(topic, sizeof(topic), "dripcore/%s/status", mac_str);
-    esp_mqtt_client_publish(mqtt_client, topic, "online", 0, 1, 0);
-    
-    // Publish temperature
-    snprintf(topic, sizeof(topic), "climate/%s/temperature", mac_str);
-    snprintf(payload, sizeof(payload), "%.1f", temperature);
-    esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 0, 0);
-    
-    // Publish humidity
-    snprintf(topic, sizeof(topic), "climate/%s/humidity", mac_str);
-    snprintf(payload, sizeof(payload), "%.1f", humidity);
-    esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 0, 0);
-}
+// Sensor publishes handled by mqtt_manager
 
 // Device information structure
 struct DeviceInfo {
@@ -312,9 +137,9 @@ extern "C" void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(3000));
         
         // Send Home Assistant discovery
-        if (mqtt_connected) {
+        if (mqtt_is_connected()) {
             ESP_LOGI(TAG, "Sending Home Assistant discovery...");
-            send_ha_discovery();
+            mqtt_send_ha_discovery();
         }
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi");
@@ -341,16 +166,16 @@ extern "C" void app_main(void)
             read_dht22_sensor(&temperature, &humidity);
             
             // Publish sensor data
-            if (mqtt_connected) {
-                publish_sensor_data(temperature, humidity);
+            if (mqtt_is_connected()) {
+                mqtt_publish_sensor(temperature, humidity);
             }
         }
         
         // Send discovery message every 60 seconds (30 cycles * 2s)
         if (count % 30 == 0) {
             send_discovery_message();
-            if (mqtt_connected) {
-                send_ha_discovery();
+            if (mqtt_is_connected()) {
+                mqtt_send_ha_discovery();
             }
         }
         
