@@ -31,6 +31,7 @@
 //   esp-idf-lib/dht: ^1.1.7"
 #include "dht.h"
 #include "credentials.h"
+#include "wifi_manager.h"
 
 static const char* TAG = "DRIPCORE";
 
@@ -42,31 +43,9 @@ static const char* TAG = "DRIPCORE";
 // DHT22 Sensor Configuration
 #define DHT22_GPIO GPIO_NUM_10
 
-// WiFi event group
-static EventGroupHandle_t s_wifi_event_group;
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
-
 // MQTT client handle
 static esp_mqtt_client_handle_t mqtt_client = nullptr;
 static bool mqtt_connected = false;
-
-// WiFi event handler
-static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                              int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "WiFi disconnected, retrying...");
-        esp_wifi_connect();
-        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-    }
-}
 
 // MQTT event handler
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -89,43 +68,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     default:
         break;
     }
-}
-
-// Initialize WiFi
-void wifi_init(void)
-{
-    s_wifi_event_group = xEventGroupCreate();
-    
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-    
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler,
-                                                        NULL,
-                                                        &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                        IP_EVENT_STA_GOT_IP,
-                                                        &wifi_event_handler,
-                                                        NULL,
-                                                        &instance_got_ip));
-    
-    wifi_config_t wifi_config = {};
-    strcpy((char*)wifi_config.sta.ssid, WIFI_SSID);
-    strcpy((char*)wifi_config.sta.password, WIFI_PASSWORD);
-    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    
-    ESP_LOGI(TAG, "WiFi init finished. Connecting to %s...", WIFI_SSID);
 }
 
 // Initialize MQTT
@@ -352,14 +294,14 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "Initializing WiFi...");
     wifi_init();
     
-    // Wait for WiFi connection
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                          WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                          pdFALSE,
-                                          pdFALSE,
-                                          portMAX_DELAY);
+    // Wait for WiFi connection (timeout 15s)
+    TickType_t start = xTaskGetTickCount();
+    const TickType_t timeout = pdMS_TO_TICKS(15000);
+    while (!wifi_is_connected() && (xTaskGetTickCount() - start) < timeout) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
     
-    if (bits & WIFI_CONNECTED_BIT) {
+    if (wifi_is_connected()) {
         ESP_LOGI(TAG, "Connected to WiFi");
         
         // Initialize MQTT
