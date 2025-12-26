@@ -496,6 +496,12 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# Sensor Configuration
+#
+CONFIG_DHT22_GPIO=10
+# end of Sensor Configuration
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

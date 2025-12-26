@@ -35,8 +35,7 @@ static const char* TAG = "DRIPCORE";
 #define DEVICE_ID "temp_and_humid_001"
 #define DEVICE_NAME "Temperature and Humidity Sensor"
 
-// DHT22 Sensor Configuration
-#define DHT22_GPIO GPIO_NUM_10
+// DHT22 initialized via sensor_dht22_init() in app_main
 
 // MQTT handled by mqtt_manager module
 
@@ -147,7 +146,7 @@ extern "C" void app_main(void)
     while (true) {
         // Read DHT22 every 30 seconds (15 cycles)
         if (count % 15 == 0) {
-            sensor_dht22_read(DHT22_GPIO, &temperature, &humidity);
+            sensor_dht22_read(&temperature, &humidity);
             
             // Publish sensor data
             if (mqtt_is_connected()) {
