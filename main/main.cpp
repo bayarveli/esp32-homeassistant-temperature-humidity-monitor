@@ -23,12 +23,6 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include "mqtt_client.h"
-// Open ESP-IDF Terminal:
-// Run the command to add dht sensor library:
-// "esp-idf-lib/dht^1.1.7"
-// Also add dependency in idf_component.yml file.
-// "dependencies:
-//   esp-idf-lib/dht: ^1.1.7"
 #include "credentials.h"
 #include "wifi_manager.h"
 #include "sensor_dht22.h"

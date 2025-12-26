@@ -1,4 +1,11 @@
 #include "sensor_dht22.h"
+
+// Open ESP-IDF Terminal:
+// Run the command to add dht sensor library:
+// "esp-idf-lib/dht^1.1.7"
+// Also add dependency in idf_component.yml file.
+// "dependencies:
+//   esp-idf-lib/dht: ^1.1.7"
 #include "dht.h"
 #include "esp_log.h"
 
