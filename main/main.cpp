@@ -29,9 +29,9 @@
 // Also add dependency in idf_component.yml file.
 // "dependencies:
 //   esp-idf-lib/dht: ^1.1.7"
-#include "dht.h"
 #include "credentials.h"
 #include "wifi_manager.h"
+#include "sensor_dht22.h"
 #include "mqtt_manager.h"
 
 static const char* TAG = "DRIPCORE";
@@ -46,17 +46,7 @@ static const char* TAG = "DRIPCORE";
 
 // MQTT handled by mqtt_manager module
 
-// DHT22 sensor okuma fonksiyonu
-void read_dht22_sensor(float* temperature, float* humidity)
-{
-    esp_err_t res = dht_read_float_data(DHT_TYPE_AM2301, DHT22_GPIO, humidity, temperature);
-    
-    if (res == ESP_OK) {
-        ESP_LOGI(TAG, "DHT22 - Temperature: %.1f°C | Humidity: %.1f%%", *temperature, *humidity);
-    } else {
-        ESP_LOGE(TAG, "DHT22 read error: %s", esp_err_to_name(res));
-    }
-}
+// DHT22 handled by sensor_dht22 module
 
 // HA discovery handled by mqtt_manager
 
@@ -163,7 +153,7 @@ extern "C" void app_main(void)
     while (true) {
         // Read DHT22 every 30 seconds (15 cycles)
         if (count % 15 == 0) {
-            read_dht22_sensor(&temperature, &humidity);
+            sensor_dht22_read(DHT22_GPIO, &temperature, &humidity);
             
             // Publish sensor data
             if (mqtt_is_connected()) {
