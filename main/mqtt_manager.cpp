@@ -1,6 +1,6 @@
 #include "mqtt_manager.h"
 #include "credentials.h"
-#include "mqtt_client.h" // ESP-IDF MQTT
+#include "mqtt_client.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -117,14 +117,13 @@ void mqtt_send_ha_discovery(void)
         "}",
         device_id, DEVICE_NAME);
 
-    // Binary sensor discovery (status)
     snprintf(binary_sensor_config, 1024,
         "{"
-        "\"name\":\"%s Status\"," 
-        "\"unique_id\":\"%s_status\"," 
+        "\"name\":\"%s Status\","
+        "\"unique_id\":\"%s_status\","
         "\"state_topic\":\"%s/%s/status\","
-        "\"payload_on\":\"online\"," 
-        "\"payload_off\":\"offline\"," 
+        "\"payload_on\":\"online\","
+        "\"payload_off\":\"offline\","
         "\"device_class\":\"connectivity\","
         "%s"
         "}",
@@ -136,15 +135,18 @@ void mqtt_send_ha_discovery(void)
 
     snprintf(sensor_config, 1024,
         "{"
-        "\"name\":\"%s Temperature\"," 
-        "\"unique_id\":\"%s_temperature\"," 
-        "\"state_topic\":\"%s/%s/temperature\"," 
-        "\"unit_of_measurement\":\"°C\"," 
-        "\"device_class\":\"temperature\"," 
-        "\"state_class\":\"measurement\"," 
+        "\"name\":\"%s Temperature\","
+        "\"unique_id\":\"%s_temperature\","
+        "\"state_topic\":\"%s/%s/temperature\","
+        "\"availability_topic\":\"%s/%s/status\","
+        "\"payload_available\":\"online\","
+        "\"payload_not_available\":\"offline\","
+        "\"unit_of_measurement\":\"°C\","
+        "\"device_class\":\"temperature\","
+        "\"state_class\":\"measurement\","
         "%s"
         "}",
-        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, device_info);
+        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, TOPIC_PREFIX, device_id, device_info);
 
     snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
@@ -152,15 +154,18 @@ void mqtt_send_ha_discovery(void)
 
     snprintf(sensor_config, 1024,
         "{"
-        "\"name\":\"%s Humidity\"," 
-        "\"unique_id\":\"%s_humidity\"," 
-        "\"state_topic\":\"%s/%s/humidity\"," 
-        "\"unit_of_measurement\":\"%%\"," 
-        "\"device_class\":\"humidity\"," 
-        "\"state_class\":\"measurement\"," 
+        "\"name\":\"%s Humidity\","
+        "\"unique_id\":\"%s_humidity\","
+        "\"state_topic\":\"%s/%s/humidity\","
+        "\"availability_topic\":\"%s/%s/status\","
+        "\"payload_available\":\"online\","
+        "\"payload_not_available\":\"offline\","
+        "\"unit_of_measurement\":\"%%\","
+        "\"device_class\":\"humidity\","
+        "\"state_class\":\"measurement\","
         "%s"
         "}",
-        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, device_info);
+        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, TOPIC_PREFIX, device_id, device_info);
 
     snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
