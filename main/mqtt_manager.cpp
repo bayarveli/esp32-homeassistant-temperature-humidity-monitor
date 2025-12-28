@@ -8,12 +8,20 @@
 
 static const char* TAG_MQTT = "MQTTManager";
 
-// Keep discovery constants local for now (we can centralize later)
+#define TOPIC_PREFIX "dripcore/"
 #define HA_DISCOVERY_PREFIX "homeassistant"
-#define DEVICE_NAME "Temperature and Humidity Sensor"
+#define DEVICE_NAME "Temperature and Humidity Monitor"
 
 static esp_mqtt_client_handle_t s_mqtt_client = nullptr;
 static bool s_mqtt_connected = false;
+static char device_id[32];
+
+static void build_device_id() {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(device_id, sizeof(device_id), "sensor-%02x%02x%02x%02x%02x%02x", 
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
@@ -49,7 +57,7 @@ void mqtt_init(void)
     if (strlen(MQTT_PASSWORD) > 0) {
         mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
     }
-
+    build_device_id();
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(s_mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(s_mqtt_client);
@@ -63,28 +71,20 @@ bool mqtt_is_connected(void)
 void mqtt_publish_sensor(float temperature, float humidity)
 {
     if (!s_mqtt_connected) return;
-
-    // Build MAC string for topic suffix
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char mac_str[13];
-    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
     char topic[64];
     char payload[32];
 
     // Publish status
-    snprintf(topic, sizeof(topic), "dripcore/%s/status", mac_str);
+    snprintf(topic, sizeof(topic), "dripcore/%s/status", device_id);
     esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 0);
 
     // Publish temperature
-    snprintf(topic, sizeof(topic), "climate/%s/temperature", mac_str);
+    snprintf(topic, sizeof(topic), "climate/%s/temperature", device_id);
     snprintf(payload, sizeof(payload), "%.1f", temperature);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
 
     // Publish humidity
-    snprintf(topic, sizeof(topic), "climate/%s/humidity", mac_str);
+    snprintf(topic, sizeof(topic), "climate/%s/humidity", device_id);
     snprintf(payload, sizeof(payload), "%.1f", humidity);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
 }
@@ -95,12 +95,6 @@ void mqtt_send_ha_discovery(void)
         ESP_LOGW(TAG_MQTT, "MQTT not connected, skipping HA discovery");
         return;
     }
-
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char mac_str[13];
-    snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     char* device_info = (char*)malloc(512);
     char* sensor_config = (char*)malloc(1024);
@@ -124,7 +118,7 @@ void mqtt_send_ha_discovery(void)
         "\"sw_version\":\"v0.0.1\","
         "\"hw_version\":\"0.1\""
         "}",
-        mac_str, DEVICE_NAME);
+        device_id, DEVICE_NAME);
 
     // Binary sensor discovery (status)
     snprintf(binary_sensor_config, 1024,
@@ -137,9 +131,9 @@ void mqtt_send_ha_discovery(void)
         "\"device_class\":\"connectivity\","
         "%s"
         "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
+        DEVICE_NAME, device_id, device_id, device_info);
 
-    snprintf(discovery_topic, sizeof(discovery_topic), "%s/binary_sensor/%s_status/config", HA_DISCOVERY_PREFIX, mac_str);
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/binary_sensor/%s_status/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, binary_sensor_config, 0, 1, 1);
     ESP_LOGI(TAG_MQTT, "Sent HA discovery for status sensor");
 
@@ -154,9 +148,9 @@ void mqtt_send_ha_discovery(void)
         "\"state_class\":\"measurement\"," 
         "%s"
         "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
+        DEVICE_NAME, device_id, device_id, device_info);
 
-    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, mac_str);
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
     ESP_LOGI(TAG_MQTT, "Sent HA discovery for temperature sensor");
 
@@ -171,9 +165,9 @@ void mqtt_send_ha_discovery(void)
         "\"state_class\":\"measurement\"," 
         "%s"
         "}",
-        DEVICE_NAME, mac_str, mac_str, device_info);
+        DEVICE_NAME, device_id, device_id, device_info);
 
-    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, mac_str);
+    snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
     ESP_LOGI(TAG_MQTT, "Sent HA discovery for humidity sensor");
 
