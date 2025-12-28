@@ -74,16 +74,13 @@ void mqtt_publish_sensor(float temperature, float humidity)
     char topic[64];
     char payload[32];
 
-    // Publish status
     snprintf(topic, sizeof(topic), "%s/%s/status", TOPIC_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 0);
 
-    // Publish temperature
     snprintf(topic, sizeof(topic), "%s/%s/temperature", TOPIC_PREFIX, device_id);
     snprintf(payload, sizeof(payload), "%.1f", temperature);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
 
-    // Publish humidity
     snprintf(topic, sizeof(topic), "%s/%s/humidity", TOPIC_PREFIX, device_id);
     snprintf(payload, sizeof(payload), "%.1f", humidity);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
@@ -137,7 +134,6 @@ void mqtt_send_ha_discovery(void)
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, binary_sensor_config, 0, 1, 1);
     ESP_LOGI(TAG_MQTT, "Sent HA discovery for status sensor");
 
-    // Temperature sensor
     snprintf(sensor_config, 1024,
         "{"
         "\"name\":\"%s Temperature\"," 
@@ -154,7 +150,6 @@ void mqtt_send_ha_discovery(void)
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
     ESP_LOGI(TAG_MQTT, "Sent HA discovery for temperature sensor");
 
-    // Humidity sensor
     snprintf(sensor_config, 1024,
         "{"
         "\"name\":\"%s Humidity\"," 
