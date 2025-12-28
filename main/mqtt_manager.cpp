@@ -8,7 +8,7 @@
 
 static const char* TAG_MQTT = "MQTTManager";
 
-#define TOPIC_PREFIX "dripcore/"
+#define TOPIC_PREFIX "env"
 #define HA_DISCOVERY_PREFIX "homeassistant"
 #define DEVICE_NAME "Temperature and Humidity Monitor"
 
@@ -75,16 +75,16 @@ void mqtt_publish_sensor(float temperature, float humidity)
     char payload[32];
 
     // Publish status
-    snprintf(topic, sizeof(topic), "dripcore/%s/status", device_id);
+    snprintf(topic, sizeof(topic), "%s/%s/status", TOPIC_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 0);
 
     // Publish temperature
-    snprintf(topic, sizeof(topic), "climate/%s/temperature", device_id);
+    snprintf(topic, sizeof(topic), "%s/%s/temperature", TOPIC_PREFIX, device_id);
     snprintf(payload, sizeof(payload), "%.1f", temperature);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
 
     // Publish humidity
-    snprintf(topic, sizeof(topic), "climate/%s/humidity", device_id);
+    snprintf(topic, sizeof(topic), "%s/%s/humidity", TOPIC_PREFIX, device_id);
     snprintf(payload, sizeof(payload), "%.1f", humidity);
     esp_mqtt_client_publish(s_mqtt_client, topic, payload, 0, 0, 0);
 }
@@ -125,13 +125,13 @@ void mqtt_send_ha_discovery(void)
         "{"
         "\"name\":\"%s Status\"," 
         "\"unique_id\":\"%s_status\"," 
-        "\"state_topic\":\"dripcore/%s/status\"," 
+        "\"state_topic\":\"%s/%s/status\","
         "\"payload_on\":\"online\"," 
         "\"payload_off\":\"offline\"," 
         "\"device_class\":\"connectivity\","
         "%s"
         "}",
-        DEVICE_NAME, device_id, device_id, device_info);
+        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, device_info);
 
     snprintf(discovery_topic, sizeof(discovery_topic), "%s/binary_sensor/%s_status/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, binary_sensor_config, 0, 1, 1);
@@ -142,13 +142,13 @@ void mqtt_send_ha_discovery(void)
         "{"
         "\"name\":\"%s Temperature\"," 
         "\"unique_id\":\"%s_temperature\"," 
-        "\"state_topic\":\"climate/%s/temperature\"," 
+        "\"state_topic\":\"%s/%s/temperature\"," 
         "\"unit_of_measurement\":\"°C\"," 
         "\"device_class\":\"temperature\"," 
         "\"state_class\":\"measurement\"," 
         "%s"
         "}",
-        DEVICE_NAME, device_id, device_id, device_info);
+        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, device_info);
 
     snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_temperature/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
@@ -159,13 +159,13 @@ void mqtt_send_ha_discovery(void)
         "{"
         "\"name\":\"%s Humidity\"," 
         "\"unique_id\":\"%s_humidity\"," 
-        "\"state_topic\":\"climate/%s/humidity\"," 
+        "\"state_topic\":\"%s/%s/humidity\"," 
         "\"unit_of_measurement\":\"%%\"," 
         "\"device_class\":\"humidity\"," 
         "\"state_class\":\"measurement\"," 
         "%s"
         "}",
-        DEVICE_NAME, device_id, device_id, device_info);
+        DEVICE_NAME, device_id, TOPIC_PREFIX, device_id, device_info);
 
     snprintf(discovery_topic, sizeof(discovery_topic), "%s/sensor/%s_humidity/config", HA_DISCOVERY_PREFIX, device_id);
     esp_mqtt_client_publish(s_mqtt_client, discovery_topic, sensor_config, 0, 1, 1);
