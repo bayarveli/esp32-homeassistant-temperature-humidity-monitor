@@ -1,8 +1,3 @@
-/*
- * DripCore - Smart Drip Controller
- * ESP32 WROOM 32D - C++ Version with Home Assistant MQTT Discovery
- */
-
 #include <cstdio>
 #include <cinttypes>
 #include <iostream>
@@ -28,35 +23,17 @@
 #include "sensor_dht22.h"
 #include "mqtt_manager.h"
 
-static const char* TAG = "DRIPCORE";
-
-// Home Assistant MQTT Discovery Configuration
-#define HA_DISCOVERY_PREFIX "homeassistant"
-#define DEVICE_ID "temp_and_humid_001"
-#define DEVICE_NAME "Temperature and Humidity Sensor"
-
-// DHT22 initialized via sensor_dht22_init() in app_main
-
-// MQTT handled by mqtt_manager module
-
-// DHT22 handled by sensor_dht22 module
-
-// HA discovery handled by mqtt_manager
-
-// Sensor publishes handled by mqtt_manager
-
-// Device information structure
+static const char* TAG = "TEMP_HUMID_MONITOR";
 struct DeviceInfo {
-    std::string device_name = "DripCore Smart Controller";
-    std::string version = "v0.1.0";
-    std::string hardware = "ESP32 WROOM 32D";
+    std::string device_name = "Temperature and Humidity Monitor";
+    std::string version = "v0.0.1";
+    std::string hardware = "ESP32-C3 Super Mini";
     std::string firmware = "ESP-IDF";
     std::string mac_address = "";
     uint32_t uptime_ms = 0;
 };
 
-// Function to send discovery message
-void send_discovery_message() {
+void log_device_info() {
     DeviceInfo device;
     
     // Get MAC address
@@ -68,7 +45,7 @@ void send_discovery_message() {
     device.mac_address = mac_str;
     
     // Get uptime
-    device.uptime_ms = esp_timer_get_time() / 1000; // Convert to milliseconds
+    device.uptime_ms = esp_timer_get_time() / 1000;
     
     // Print discovery message
     ESP_LOGI(TAG, "=== DEVICE DISCOVERY ===");
@@ -85,7 +62,7 @@ void send_discovery_message() {
 
 extern "C" void app_main(void)
 {
-    ESP_LOGI(TAG, "DripCore Smart Controller Starting...");
+    ESP_LOGI(TAG, "Application starting...");
     
     // Initialize NVS (required for WiFi)
     esp_err_t ret = nvs_flash_init();
@@ -96,7 +73,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(ret);
     
     // Send initial discovery message (serial)
-    send_discovery_message();
+    log_device_info();
     
     // Initialize WiFi
     ESP_LOGI(TAG, "Initializing WiFi...");
@@ -156,7 +133,7 @@ extern "C" void app_main(void)
         
         // Send discovery message every 60 seconds (30 cycles * 2s)
         if (count % 30 == 0) {
-            send_discovery_message();
+            log_device_info();
             if (mqtt_is_connected()) {
                 mqtt_send_ha_discovery();
             }
