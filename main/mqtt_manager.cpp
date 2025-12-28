@@ -10,7 +10,7 @@ static const char* TAG_MQTT = "MQTTManager";
 
 #define TOPIC_PREFIX "env"
 #define HA_DISCOVERY_PREFIX "homeassistant"
-#define DEVICE_NAME "Temperature and Humidity Monitor"
+#define DEVICE_NAME "TH Sensor"
 
 static esp_mqtt_client_handle_t s_mqtt_client = nullptr;
 static bool s_mqtt_connected = false;
