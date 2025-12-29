@@ -1,27 +1,22 @@
 #include <cstdio>
 #include <cinttypes>
-#include <iostream>
 #include <string>
-#include <cstring>
-#include <cstdlib>
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
+
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
-#include "esp_wifi.h"
 #include "esp_event.h"
+#include "freertos/task.h"
+#include "freertos/FreeRTOS.h"
 #include "nvs_flash.h"
-#include "mqtt_client.h"
-#include "credentials.h"
-#include "wifi_manager.h"
-#include "sensor_dht22.h"
+#include "sdkconfig.h"
+
 #include "mqtt_manager.h"
+#include "sensor_dht22.h"
+#include "wifi_manager.h"
 
 static const char* TAG = "TEMP_HUMID_MONITOR";
 struct DeviceInfo {

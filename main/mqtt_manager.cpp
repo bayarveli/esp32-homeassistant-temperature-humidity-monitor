@@ -6,7 +6,7 @@
 #include "esp_mac.h"
 #include <cstring>
 
-static const char* TAG_MQTT = "MQTTManager";
+static const char* TAG_MQTT = "MqttManager";
 
 #define TOPIC_PREFIX "env"
 #define HA_DISCOVERY_PREFIX "homeassistant"
