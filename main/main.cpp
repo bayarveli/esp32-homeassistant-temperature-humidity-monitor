@@ -90,12 +90,6 @@ extern "C" void app_main(void)
         
         // Wait a bit for MQTT connection
         vTaskDelay(pdMS_TO_TICKS(3000));
-        
-        // Send Home Assistant discovery
-        if (mqtt_is_connected()) {
-            ESP_LOGI(TAG, "Sending Home Assistant discovery...");
-            mqtt_send_ha_discovery();
-        }
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi");
     }
@@ -126,12 +120,9 @@ extern "C" void app_main(void)
             }
         }
         
-        // Send discovery message every 60 seconds (30 cycles * 2s)
+        // Log device info every 60 seconds (30 cycles * 2s)
         if (count % 30 == 0) {
             log_device_info();
-            if (mqtt_is_connected()) {
-                mqtt_send_ha_discovery();
-            }
         }
         
         count++;
