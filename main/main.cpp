@@ -49,8 +49,18 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Initializing MQTT...");
         mqtt_init();
         
-        // Wait a bit for MQTT connection
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        // Wait for MQTT connection (timeout 10s)
+        TickType_t mqtt_start = xTaskGetTickCount();
+        const TickType_t mqtt_timeout = pdMS_TO_TICKS(10000);
+        while (!mqtt_is_connected() && (xTaskGetTickCount() - mqtt_start) < mqtt_timeout) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        if (mqtt_is_connected()) {
+            ESP_LOGI(TAG, "MQTT connection established");
+        } else {
+            ESP_LOGW(TAG, "MQTT connection timeout");
+        }
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi");
     }
