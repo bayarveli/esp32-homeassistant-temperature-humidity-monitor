@@ -33,6 +33,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG_MQTT, "MQTT Connected");
         s_mqtt_connected = true;
+        char topic[64];
+        snprintf(topic, sizeof(topic), "%s/%s/status", TOPIC_PREFIX, device_id);
+        esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 1);
         mqtt_send_ha_discovery();
         break;
     case MQTT_EVENT_DISCONNECTED:
@@ -82,9 +85,6 @@ void mqtt_publish_sensor(float temperature, float humidity)
     if (!s_mqtt_connected) return;
     char topic[64];
     char payload[32];
-
-    snprintf(topic, sizeof(topic), "%s/%s/status", TOPIC_PREFIX, device_id);
-    esp_mqtt_client_publish(s_mqtt_client, topic, "online", 0, 1, 0);
 
     snprintf(topic, sizeof(topic), "%s/%s/temperature", TOPIC_PREFIX, device_id);
     snprintf(payload, sizeof(payload), "%.1f", temperature);
