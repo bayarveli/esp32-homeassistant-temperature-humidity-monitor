@@ -1,7 +1,6 @@
 #include "mqtt_manager.h"
 #include "credentials.h"
 #include "mqtt_client.h"
-#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include <cstring>
@@ -119,7 +118,7 @@ void mqtt_send_ha_discovery(void)
         "\"device\":{"
         "\"identifiers\":[\"%s\"],"
         "\"name\":\"%s\","
-        "\"model\":\"ESP32-C3 Super Mini and DHT22\","
+        "\"model\":\"ESP32-C3 Super Mini with DHT22\","
         "\"manufacturer\":\"Pupa DIY\","
         "\"sw_version\":\"v0.0.1\","
         "\"hw_version\":\"0.1\""
