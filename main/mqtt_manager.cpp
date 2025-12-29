@@ -49,8 +49,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_init(void)
 {
+    build_device_id();
+
+    char lwt_topic[64];
+    snprintf(lwt_topic, sizeof(lwt_topic), "%s/%s/status", TOPIC_PREFIX, device_id);
+
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = MQTT_BROKER_URI;
+    mqtt_cfg.session.last_will.topic = lwt_topic;
+    mqtt_cfg.session.last_will.msg = "offline";
+    mqtt_cfg.session.last_will.qos = 1;
+    mqtt_cfg.session.last_will.retain = true;
 
     if (strlen(MQTT_USERNAME) > 0) {
         mqtt_cfg.credentials.username = MQTT_USERNAME;
@@ -58,7 +67,6 @@ void mqtt_init(void)
     if (strlen(MQTT_PASSWORD) > 0) {
         mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
     }
-    build_device_id();
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(s_mqtt_client, (esp_mqtt_event_id_t)ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(s_mqtt_client);
