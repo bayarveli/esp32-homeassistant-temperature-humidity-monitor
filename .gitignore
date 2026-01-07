@@ -53,3 +53,16 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# ESP-IDF specific
+build/
+sdkconfig
+sdkconfig.old
+dependencies.lock
+managed_components/
+
+# Credentials with sensitive data
+main/credentials.h
+
+# IDE and Editor files
+.vscode/

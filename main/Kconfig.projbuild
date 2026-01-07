@@ -1,0 +1,9 @@
+menu "Sensor Configuration"
+
+config DHT22_GPIO
+    int "DHT22 GPIO number"
+    default 10
+    help
+        GPIO pin number used for the DHT22 sensor.
+
+endmenu
